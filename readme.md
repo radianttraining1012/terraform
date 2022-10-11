@@ -11,7 +11,7 @@ choco install terraform
 https://www.terraform.io/downloads
 
 -----------------
--> terraform provider version constraint. version arugment is used to specify provider constraint.
+terraform provider version constraint. version arugment is used to specify provider constraint.
 
 terraform {
   required_providers {
@@ -26,7 +26,7 @@ provider "artifactory" {
   # Configuration options
 }
 -----------------
--> terraform version constraint. required_version is used to specify terraform version constraint.
+terraform version constraint. required_version is used to specify terraform version constraint.
 terraform {
   required_providers {
     artifactory = {
@@ -96,4 +96,3 @@ terraform destroy:
 It will delete all resources mentioned in your configuration.
 
 -----------------------
-
