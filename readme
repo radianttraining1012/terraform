@@ -102,4 +102,35 @@ Destroy target resource:
 ResourceIdentifier: <resourcetype.localresourcename>
 terraform destroy -target aws_iam_user.myuser -auto-approve
 
------
+------
+Few Examples:--
+------
+1. Create a rds db and take snapshot of that instance instance class db.t2.micro.
+2. Create EBS volume and take snapshot of the EBS volume
+3. Create EC2 instance and EBS volume and attach EBS volume to the instance.
+4. Create Classic Load Balancer and register the EC2 instance with ELB.
+5. Create 5 IAM users and 1 groups. Add all users to group.
+6. Launch EC2 instance and install nginx using user data. Take AMI of that instance and then launch another machine using that AMI.
+7. Create Lambda Function to print "hello world"
+8. Create S3 bucket and attach simple policy to allow public read:
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicRead",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion"
+            ],
+            "Resource": [
+                "arn:aws:s3:::DOC-EXAMPLE-BUCKET/*"
+            ]
+        }
+    ]
+}
+9. Create Security Group and open ingress and egress to 0.0.0.0/0.
+10. Create VPC with 2 subnets.
+
+
