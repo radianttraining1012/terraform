@@ -96,3 +96,10 @@ terraform destroy:
 It will delete all resources mentioned in your configuration.
 
 -----------------------
+Destroy target resource: 
+ResourceIdentifier:
+terraform destroy -target aws_iam_user.myuser -auto-approve
+
+
+
+-----
