@@ -134,3 +134,21 @@ Few Examples:--
 10. Create VPC with 2 subnets.
 
 
+
+1) We covered implicit dependency in terraform. by specifying resource identifier.attribute.
+
+2) Terraform output 
+output "volume_info" {
+   value = "resource_identifier"
+}
+
+3) terraform sensitive variables. In case you don't want to print the exact value on console output. You can use sensitive = true as below:
+
+output "volume_info" {
+   value = "resource_identifier"
+   sensitive = true
+}
+
+4) Reading the terraform documentation, resources, arguments refrences, attributes refrences
+
+
