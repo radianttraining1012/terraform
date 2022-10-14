@@ -151,4 +151,128 @@ output "volume_info" {
 
 4) Reading the terraform documentation, resources, arguments refrences, attributes refrences
 
+5. Terraform State File:
+How terraform track what is created and what is destroyed? It maintains a database file locally where you are running terraform command from. State file stores state of infrastructure that is being used from TF files. Never touch/edit/update state file. Always consider backup of state file.
+The state allows terraform to map real world resources to your existing configuration. 
+AWS Demo:
+Create EC2 Machine and a S3 bucket in AWS using terraform
+Notice the tf state file
+Remove the tfstate file
+Run terraform plan and apply and try creating both EC2 machine and bucket.
+Delete both EC2 machine and S3 bucket.
+Create it again.
+
+
+6. Terraform Data Source:-
+
+1. Create provider.tf file
+2. data.tf
+data "aws_ami" "amznlinux" {
+    most_recent = false
+    owners = ["AWS-ACCT-Number"]
+    filter {
+        name = "name"
+        values = ["*securedimage"]
+    }
+    filter {
+        name = "root-device-type"
+        values = ["ebs"]
+    }
+    filter {
+        name = "virtualization-type"
+        values = ["hvm"]
+    }
+    filter {
+        name = "architecture"
+        values = ["x86_64"]
+    }
+}
+3. main.tf
+resource "aws_instance" "webvm" {
+   ami = data.aws_ami.amznlinux.id
+   instance_type = "t2.micro"
+   key_name = aws_key_pair.deployer.key_name
+   user_data = file ("script.sh")
+   vpc_security_group_ids = [aws_security_group.allow_ssh.id, aws_security_group.allow_web.id]
+   tags = {
+    "Name" = "Webserver"
+   }
+}
+4. keypair.tf
+resource "aws_key_pair" "deployer" {
+  key_name   = "deployer-key"
+  public_key = "ssh-rsa WF9***"
+}
+
+5. output.tf
+output "myimage" {
+    value = data.aws_ami.amznlinux.id
+}
+6.script.sh
+#! /bin/bash
+sudo yum update -y
+sudo yum install -y httpd
+sudo systemctl enable httpd
+sudo service httpd start
+echo "<h1>We are learning Terraform</h1>" | sudo tee /var/www/html/index.html
+
+7. securitygroup.tf
+resource "aws_security_group" "allow_ssh" {
+  name        = "allow_ssh"
+  description = "Allow SSH inbound traffic"
+  ingress {
+    description      = "Allow SSH"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description      = "Allow all outgoing traffic"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "allow_ssh"
+  }
+}
+
+
+resource "aws_security_group" "allow_web" {
+  name        = "allow_apache"
+  description = "Allow Apache inbound traffic"
+  ingress {
+    description      = "Allow web apache"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+  ingress {
+    description      = "Allow SSL web apache"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description      = "Allow all outgoing traffic"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "allow_apache"
+  }
+}
+
+
 
