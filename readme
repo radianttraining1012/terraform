@@ -274,5 +274,405 @@ resource "aws_security_group" "allow_web" {
   }
 }
 
+---------------------------------------
+Explicit Dependency: Use switch depends_on
+
+resource "aws_instance" "webvm01" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.micro"
+   availability_zone = "us-east-1b"
+}
+
+resource "aws_instance" "webvm02" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.micro"
+   availability_zone = "us-east-1b"
+}
+
+resource "aws_instance" "webvm03" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.micro"
+   availability_zone = "us-east-1b"
+   depends_on = [ aws_instance.webvm01, aws_instance.webvm02 ]
+}
 
 
+------------------------------------------------------
+LifeCycle:
+------------------------------------------------------
+1. condition:
+
+resource "aws_instance" "example" {
+  instance_type = "t2.micro"
+  ami           = data.aws_ami.example.id
+
+  lifecycle {
+    precondition {
+      condition     = data.aws_ami.example.architecture == "x86_64"
+      error_message = "The selected AMI must be for the x86_64 architecture."
+    }
+
+    # The EC2 instance must be allocated a public DNS hostname.
+    postcondition {
+      condition     = self.public_dns != ""
+      error_message = "EC2 instance must be in a VPC that has public DNS hostnames enabled."
+    }
+  }
+}
+
+data "aws_ebs_volume" "example" {
+  filter {
+    name = "volume-id"
+    values = [aws_instance.example.root_block_device[0].volume_id]
+  }
+
+  lifecycle {
+    # The EC2 instance will have an encrypted root volume.
+    postcondition {
+      condition     = self.encrypted == true
+      error_message = "The server's root volume is not encrypted."
+    }
+  }
+}
+
+output "api_base_url" {
+  value = "https://${aws_instance.example.public_dns}:8433/"
+}
+
+2. create before destroy
+resource "aws_instance" "webvm02" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.medium"
+   availability_zone = "us-east-1b"
+   lifecycle {
+    create_before_destroy = true
+  }   
+}
+3. ignore_changes
+resource "aws_instance" "webvm02" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.medium"
+   availability_zone = "us-east-1b"
+   lifecycle {
+    ignore_changes  = [ tags ]
+  }   
+}
+4. precondition
+variable "ami" {
+    default = "ami-026b57f3c383c2eec"
+}
+
+resource "aws_instance" "webvm02" {
+   ami = var.ami
+   instance_type = "t2.medium"
+   availability_zone = "us-east-1b"
+   lifecycle {
+     precondition {
+       condition     = length(var.ami) == 21 && substr(var.ami, 0, 4) == "ami-"
+       error_message = "The selected AMI must have 21 characters and starts with string ami-."
+    }
+  }   
+}
+
+5. prevent _destroy
+
+resource "aws_instance" "webvm02" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.medium"
+   availability_zone = "us-east-1b"
+   lifecycle {
+    prevent_destroy = true
+  }   
+}
+6. replace_triggered_by
+
+resource "aws_instance" "webvm02" {
+   ami = "ami-026b57f3c383c2eec"
+   instance_type = "t2.micro"
+   availability_zone = "us-east-1b"
+   lifecycle {
+    replace_triggered_by  = [ aws_s3_bucket.b ]
+  }   
+}
+
+resource "aws_s3_bucket" "b" {
+  bucket = "my-tf-test-bucket121232"
+  force_destroy = true
+}
+
+----------------------------------------------------
+Variables:
+----------------------------------------------------
+# Input Variables
+variable "aws_region" {
+  description = "Region in which AWS resources to be created"
+  type        = string
+  default     = "us-east-1"
+}
+
+
+variable "ec2_ami_id" {
+  description = "AMI ID"
+  type        = string
+  default     = "ami-0915bcb5fa77e4892" # Amazon2 Linux AMI ID
+}
+
+variable "ec2_instance_type" {
+  description = "EC2 Instance Type"
+  type        = string
+  default     = "t2.micro"
+}
+
+variable "ec2_instance_count" {
+  description = "EC2 Instance Count"
+  type        = number
+  default     = 2
+}
+
+
+main.tf
+resource "aws_instance" "webvm" {
+   ami = data.aws_ami.amznlinux.id
+   instance_type = var.ec2_instance_type
+   key_name = aws_key_pair.deployer.key_name
+   user_data = file ("script.sh")
+   count = var.ec2_instance_count
+   vpc_security_group_ids = [aws_security_group.allow_ssh.id, aws_security_group.allow_web.id]
+   tags = {
+    "Name" = "Webserver"
+   }
+}
+
+Create other resources on your own.
+If you don't specify default values in the variables.tf file then it will prompt from the user during execution.
+
+Variable overriding using CLI and environment variables:
+# Option-1 (Always provide -var for both plan and apply)
+# Review the terraform plan
+terraform plan -var="ec2_instance_type=t3.large" -var="ec2_instance_count=1"
+
+# Create Resources (optional)
+terraform apply -var="ec2_instance_type=t3.large" -var="ec2_instance_count=1"
+
+# Option-2 (Generate plan file with -var and use that with apply)
+# Generate Terraform plan file
+terraform plan -var="ec2_instance_type=t3.large" -var="ec2_instance_count=1" -out plan.out
+
+# Create / Deploy Terraform Resources using Plan file
+terraform apply plan.out 
+
+----------------------------
+# SET Environment Variables
+export TF_VAR_ec2_instance_count=1
+export TF_VAR_ec2_instance_type=t2.medium
+echo $TF_VAR_ec2_instance_count, $TF_VAR_ec2_instance_type
+
+unset TF_VAR_ec2_instance_count
+unset TF_VAR_ec2_instance_type
+echo $TF_VAR_ec2_instance_count, $TF_VAR_ec2_instance_type
+
+------
+1. 
+If the file name is terraform.tfvars, terraform will auto-load the variables present in this file by overriding the default values in variables.tf.
+
+2. 
+You can create file with your own name and assign value to variable. Use that -var-file while creating plan or apply.
+
+
+terraform plan -var-file="custom.tfvars"
+
+3. Create a file custom.auto.tfvars. With this extension, whatever may be the file name, the variables inside these files will be auto loaded during terraform plan or apply
+
+ec2_instance_type  = "r4.large"
+
+-------------
+List: Variables
+------------
+variable "ec2_instance_type" {
+  description = "EC2 Instance Type"
+  type = list(string)
+  default = ["t3.micro", "t3.small", "t3.large"]
+}
+
+call this variable using var.ec2_instance_type[0], var.ec2_instance_type[1] and var.ec2_instance_type[2] in your main.tf file
+
+----------------
+Map: Variables
+----------------
+variable "ec2_instance_type" {
+  description = "EC2 Instance Type"
+  type = map(string)
+  default = {
+    us-east-1 = "t2.micro"
+    us-west-2 = "t2.nano"
+    ap-south-1 = "t2.small"
+  }
+}
+
+call this variable using ec2_instance_type.us-east-1, ec2_instance_type.us-west-2 and ec2_instance_type.ap-south-1 etc
+
+--------------------
+Count and condition example
+-------------------
+resource "aws_instance" "webvm" {
+   ami = data.aws_ami.amznlinux.id
+   instance_type = var.ec2_instance_type["us-west-2"]
+   key_name = aws_key_pair.deployer.key_name
+   user_data = file ("script.sh")
+   vpc_security_group_ids = [aws_security_group.allow_ssh.id, aws_security_group.allow_web.id]
+   tags = var.common_tags
+   count = var.servertype == "webserver" ? 1 : 0
+}
+
+resource "aws_instance" "appvm" {
+   ami = data.aws_ami.amznlinux.id
+   instance_type = var.ec2_instance_type["us-east-1"]
+   key_name = aws_key_pair.deployer.key_name
+   user_data = file ("script.sh")
+   vpc_security_group_ids = [aws_security_group.allow_ssh.id, aws_security_group.allow_web.id]
+   tags = var.common_tags
+   count = var.servertype == "appserver" ? 1 : 0 
+}
+
+------------------------------
+/*
+resource "aws_iam_user" "iamuser" {
+#  name = "myuser-${count.index}"
+  name = var.usernames[count.index]    
+  path = "/system/"
+  count = 3
+}
+*/
+resource "aws_iam_user" "iamuser" {
+  for_each = toset( ["rizwan", "devuser","fakeuser", "stguser", "produser", "prod1"] )
+  name     = each.key
+}
+
+one more example
+resource "aws_instance" "myec2" {
+  ami = "ami-0cea098ed2ac54925"
+  for_each  = {
+      devkey = "t2.micro"
+      stgkey = "t2.medium"
+      prdkey = "r5.large"
+   }
+  instance_type    = each.value
+  key_name         = each.key
+  tags =  {
+   Name = each.value
+    }
+}
+
+-------
+validations
+---------
+variable "ec2_ami_id" {
+  description = "AMI ID"
+  type        = string
+  validation {
+    condition = length(var.ec2_ami_id) > 4 && substr(var.ec2_ami_id, 0, 4) == "ami-"
+    error_message = "The ec2_ami_id value must be a valid AMI id, starting with \"ami-\"."
+  }
+}
+
+------
+boolean
+------
+variable "ec2_instance_count" {
+  description = "EC2 Instance Count"
+  type        = bool
+}
+
+-------
+# Create S3 Bucket - with Input Variables 
+/*
+resource "aws_s3_bucket" "mys3bucket" {
+  bucket = "${var.app_name}-${var.environment_name}-bucket"
+  acl = "private"
+  tags = {
+    Name = "${var.app_name}-${var.environment_name}-bucket"
+    Environment = var.environment_name
+  }
+}
+*/
+
+# Define Local Values
+locals {
+  bucket-name = "${var.app_name}-${var.environment_name}-bucket" # Complex expression
+}
+
+# Create S3 Bucket - with Input Variables & Local Values
+resource "aws_s3_bucket" "mys3bucket" {
+  bucket = local.bucket-name
+  tags = {
+    Name = local.bucket-name
+    Environment = var.environment_name
+  }
+}
+
+
+
+resource "aws_instance" "app-dev" {
+   ami = "ami-082b5a644766e0e6f"
+   instance_type = "t2.micro"
+   tags = local.common_tags
+}
+
+resource "aws_instance" "db-dev" {
+   ami = "ami-082b5a644766e0e6f"
+   instance_type = "t2.small"
+   tags = local.common_tags
+}
+
+resource "aws_ebs_volume" "db_ebs" {
+  availability_zone = "${var.aws_region}-a"
+  size              = 8
+  tags = local.common_tags
+}
+
+locals {
+  common_tags = {
+    Owner = "DevOps Team"
+    service = "backend"
+  }
+}
+
+# Input Variables
+variable "aws_region" {
+  description = "Region in which AWS Resources to be created"
+  type = string
+  default = "us-east-1"
+}
+
+# App Name S3 Bucket used for
+variable "app_name" {
+  description = "Application Name"
+  type = string
+}
+
+# Environment Name
+variable "environment_name" {
+  description = "Environment Name"
+  type = string
+}
+
+
+
+-----------------------------------
+
+
+
+
+----------------------------------------------------
+Null Resource
+-----------------------------------------------------
+resource "aws_eip" "elasticIP" {
+    vpc = true
+    depends_on = [ null_resource.check_endpoint ]
+}
+
+resource "null_resource" "check_endpoint" {
+    provisioner "local-exec" {
+      command = "curl https://google.com"
+    }
+}
