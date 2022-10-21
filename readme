@@ -676,3 +676,128 @@ resource "null_resource" "check_endpoint" {
       command = "curl https://google.com"
     }
 }
+----------------------------------------------------
+DynamicBlock
+-----------------------------------------------------
+resource "aws_security_group" "allow_ssh_web" {
+  name        = "dynamic-sg"
+  description = "Ingress for SSH and Web"
+
+  dynamic "ingress" {
+    for_each = var.sg_ports
+    iterator = port
+    content {
+      from_port   = port.value
+      to_port     = port.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
+
+  dynamic "egress" {
+    for_each = var.sg_ports
+    content {
+      from_port   = egress.value
+      to_port     = egress.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
+}
+
+
+----------------------------------------------------
+workspace and multiple provider
+-----------------------------------------------------
+
+### This is multi provider example
+provider "aws" {
+  alias      = "east2"
+  region     = "us-east-2"
+  access_key = "AKIAYC5UVKRADAWZGVGH"
+  secret_key = "cfl6f/t3xgaFaCYfX/csmnBcRd9VvYRfxeNBGsz9"
+}
+
+
+
+/*
+resource "aws_instance" "ec2" {
+    ami = "ami-0645b47beb2163eae"
+    instance_type = "t2.micro"
+    count = terraform.workspace == "default" ? 1 : 0
+}
+*/
+
+resource "aws_instance" "ec2" {
+    provider = aws.east2
+    ami = "ami-0645b47beb2163eae"
+    instance_type = lookup(var.ec2type,terraform.workspace,"t2.medium")
+#    count = terraform.workspace == "default" ? 1 : 0
+}
+
+variable "ec2type"  {
+    type = map
+    default = {
+        default = "t2.medium"
+        dev = "t2.micro"
+        stage = "t2.large"
+        prod = "r5.large"
+    }
+}
+
+
+
+----------------------------------------------------
+caching
+-----------------------------------------------------
+https://developer.hashicorp.com/terraform/cli/config/config-file
+
+----------------------------------------------------
+import used to bring services in control of terraform whch are created outside of terraform
+-----------------------------------------------------
+terraform improt <resource identifier> <real resourceid>
+
+
+----------------------------------------------------
+terraform fmt and terraform validate commands are used to format the syntac and do the syntax validation 
+-----------------------------------------------------
+
+
+----------------------------------------------------
+Terraform cloud and sentinel and remote state management
+-----------------------------------------------------
+terraform {
+	backend "remote" {
+		organization = "my-org" # org name from step 2.
+		workspaces {
+			name = "my-app" # name for your app's state.
+		}
+	}
+}
+
+CLI or VSC integrated workspaces
+
+----------------------------------------------------
+Terraform cloud and sentinel and remote state management
+-----------------------------------------------------
+
+----------------------------------------------------
+Terraform graph is used to see visualized form of all resources to be created throgh terraform
+-----------------------------------------------------
+
+----------------------------------------------------
+terraform taint will taint the resources so that when you apply terraform next time it will recreate the resources
+-----------------------------------------------------
+
+----------------------------------------------------
+terraform modules inbuild and custom modules and also can use github as the source
+remember how to get value to module variables
+remember null resources used in module
+dependency explicit and implicit
+-----------------------------------------------------
+
+
+
+
+
+
