@@ -797,7 +797,17 @@ dependency explicit and implicit
 -----------------------------------------------------
 
 
-
+S3 as the backend and dynamodb as the locking storage
+terraform {
+    backend "s3" {
+        bucket = "terraform-bsl-19102022"
+        key = "statedb/terraform.tfstate"
+        region = "us-east-1"
+        access_key = "XXXX"
+        secret_key = "XXXX"
+        dynamodb_table = "tf-state-lock"
+    }
+}
 
 
 
